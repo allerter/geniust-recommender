@@ -1,2 +1,2 @@
-release: bash start.sh
-web: ./start.sh
+release: chmod +x start.sh
+web: start.sh
