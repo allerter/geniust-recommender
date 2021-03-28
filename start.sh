@@ -2,13 +2,9 @@
 # from https://github.com/tiangolo/uvicorn-gunicorn-docker
 set -e
 
-if [ -f /gtr/main.py ]; then
-    DEFAULT_MODULE_NAME=gtr.main
-elif [ -f /main.py ]; then
-    DEFAULT_MODULE_NAME=main
-fi
+DEFAULT_MODULE_NAME=gtr.main
 MODULE_NAME=${MODULE_NAME:-$DEFAULT_MODULE_NAME}
-VARIABLE_NAME=${VARIABLE_NAME:-gtr}
+VARIABLE_NAME=${VARIABLE_NAME:-app}
 export APP_MODULE=${APP_MODULE:-"$MODULE_NAME:$VARIABLE_NAME"}
 
 if [ -f /gtr/gunicorn_conf.py ]; then
