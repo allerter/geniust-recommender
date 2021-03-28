@@ -14,7 +14,7 @@ export APP_MODULE=${APP_MODULE:-"$MODULE_NAME:$VARIABLE_NAME"}
 if [ -f /gtr/gunicorn_conf.py ]; then
     DEFAULT_GUNICORN_CONF=/gtr/gunicorn_conf.py
 else
-    DEFAULT_GUNICORN_CONF=/gunicorn_conf.py
+    DEFAULT_GUNICORN_CONF=gunicorn_conf.py
 fi
 export GUNICORN_CONF=${GUNICORN_CONF:-$DEFAULT_GUNICORN_CONF}
 export WORKER_CLASS=${WORKER_CLASS:-"uvicorn.workers.UvicornWorker"}
