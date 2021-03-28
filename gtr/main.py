@@ -1,10 +1,9 @@
 import logging
 from typing import Dict, List, Optional
 
-import tekore as tk
 import lyricsgenius as lg
+import tekore as tk
 from fastapi import Depends, FastAPI, HTTPException, Path, Query, Request
-
 
 from gtr.constants import (
     GENIUS_CLIENT_ID,

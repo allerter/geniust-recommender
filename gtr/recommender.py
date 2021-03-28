@@ -360,7 +360,8 @@ class Recommender:
             logger.debug(
                 "Selected songs. Entropy: %s - Preferences: %s",
                 rng._bit_generator._seed_seq.entropy,
-                user_preferences)
+                user_preferences,
+            )
         else:
             logger.debug("No similar songs for %s", user_preferences)
             return []

@@ -1,15 +1,13 @@
 import asyncio
-from unittest.mock import patch, MagicMock, Mock, create_autospec, AsyncMock
+from unittest.mock import AsyncMock, MagicMock, Mock, create_autospec, patch
 
-import pytest
 import lyricsgenius as lg
+import pytest
 import tekore as tk
 from fastapi.testclient import TestClient
 
-
 from gtr.main import app
 from gtr.recommender import Preferences, Recommender
-
 
 client = TestClient(app)
 
@@ -106,8 +104,8 @@ class TestAPI:
             OAuth2 = None
 
         with patch("gtr.main.recommender", recommender), patch(
-                "gtr.main.genius_auth", OAuth2), patch(
-                "gtr.main.spotify_auth", RefreshingCredentials):
+            "gtr.main.genius_auth", OAuth2
+        ), patch("gtr.main.spotify_auth", RefreshingCredentials):
             response = client.get(
                 "/preferences", params={f"{platform}_code": "test_code"}
             )
@@ -142,7 +140,8 @@ class TestAPI:
             OAuth2 = None
 
         with patch("gtr.main.genius_auth", OAuth2), patch(
-                "gtr.main.spotify_auth", RefreshingCredentials):
+            "gtr.main.spotify_auth", RefreshingCredentials
+        ):
             response = client.get(
                 "/preferences", params={f"{platform}_code": "test_code"}
             )

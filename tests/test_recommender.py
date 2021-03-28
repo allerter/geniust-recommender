@@ -11,16 +11,14 @@ class TopArtists:
     Artist = namedtuple("Artist", "name")
 
     def __init__(self, artist_names):
-        self.items = [self.Artist(name=name)
-                      for name in artist_names]
+        self.items = [self.Artist(name=name) for name in artist_names]
 
 
 class TopTracks:
     Track = namedtuple("Track", "name, artists")
 
     def __init__(self, track_names):
-        self.items = [self.Track(name=name, artists=[name])
-                      for name in track_names]
+        self.items = [self.Track(name=name, artists=[name]) for name in track_names]
 
 
 def get_mock_coro(return_value):
@@ -80,7 +78,8 @@ class TestRecommender:
         platform,
     ):
         httpx_mock.add_response(
-            json=lastfm_track_toptags if lastfm_200_response else {})
+            json=lastfm_track_toptags if lastfm_200_response else {}
+        )
         token = "test_token"
 
         current_module = "gtr.recommender"
