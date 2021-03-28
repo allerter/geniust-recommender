@@ -23,7 +23,7 @@ jobs:
       if: startsWith(github.ref, 'refs/tags/')
       run: |
         file_version=$(cat gtr/VERSION)
-        echo ::set-output name=tag_version::${GITHUB_REF/refs\/tags\//}
+        tag_version=${GITHUB_REF#refs/*/}
         if test "$file_version" = "$tag_version";
         then
           echo "Versions match! >> $file_version"
