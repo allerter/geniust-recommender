@@ -1,5 +1,4 @@
-import asyncio
-from unittest.mock import AsyncMock, MagicMock, Mock, create_autospec, patch
+from unittest.mock import create_autospec, patch
 
 import lyricsgenius as lg
 import pytest
