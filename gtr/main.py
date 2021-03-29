@@ -267,6 +267,18 @@ def search_artists(q: str = Query(..., title="Artist name", example="Eminem")):
 
 
 @app.get(
+    "/songs/len",
+    summary="Number of songs in the recommender",
+    response_model=Dict[str, int],
+    tags=["songs"],
+    response_description="Number of songs",
+)
+def len_songs():
+    """Get the number of songs available in the recommender."""
+    return {"len": recommender.num_songs}
+
+
+@app.get(
     "/songs/{id}",
     summary="Get a song",
     response_model=Dict[str, Song],

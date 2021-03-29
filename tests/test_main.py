@@ -235,3 +235,9 @@ class TestAPI:
         response_dict = response.json()
         assert response.status_code == 400
         assert response_dict.get("songs") is None
+
+    def test_len_songs(self):
+        response = client.get("/songs/len")
+        response_dict = response.json()
+        assert response.status_code == 200
+        assert type(response_dict["len"]) is int

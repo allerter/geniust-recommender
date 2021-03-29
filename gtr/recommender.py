@@ -93,6 +93,7 @@ class Recommender:
             en.drop(columns=["download_url"]), fa, how="outer"
         )
         self.songs.replace({np.NaN: None}, inplace=True)
+        self.num_songs = len(self.songs)
 
         # Read artists
         logger.debug("Reading artists from CSV files")
