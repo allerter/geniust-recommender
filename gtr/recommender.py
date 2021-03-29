@@ -165,7 +165,7 @@ class Recommender:
             64: ["rock", "country", "traditional"],
             65: ["rock", "country", "traditional"],
         }
-        logger.debug("Recommender inifilize successful.")
+        logger.debug("Recommender initialization successful.")
 
     def artist(self, id: int) -> Artist:
         """Gets Artist
