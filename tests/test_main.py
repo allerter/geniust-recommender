@@ -150,7 +150,7 @@ class TestAPI:
         assert response.status_code == 400
         assert response_dict.get("preferences") is None
 
-    @pytest.mark.parametrize("artists", ["", "Eminem,Blackbear"])
+    @pytest.mark.parametrize("artists", [None, "", "Eminem,Blackbear"])
     def test_recommendations(self, artists):
         response = client.get(
             "/recommendations", params={"genres": "pop,rock", "artists": artists}
@@ -159,14 +159,14 @@ class TestAPI:
         assert response.status_code == 200
         assert isinstance(response_dict["recommendations"], list)
 
-    def test_recommendations_missing_artists(self):
-        response = client.get("/recommendations", params={"genres": "pop"})
+    def test_recommendations_empty_genres(self):
+        response = client.get("/recommendations", params={"genres": "", "artists": ""})
         response_dict = response.json()
         assert response.status_code == 400
         assert response_dict.get("recommendations") is None
 
-    def test_recommendations_no_genres(self):
-        response = client.get("/recommendations", params={"genres": "", "artists": ""})
+    def test_recommendations_missing_genres(self):
+        response = client.get("/recommendations", params={"artists": "Eminem"})
         response_dict = response.json()
         assert response.status_code == 400
         assert response_dict.get("recommendations") is None

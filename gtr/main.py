@@ -47,22 +47,23 @@ spotify_auth = tk.RefreshingCredentials(
 )
 
 
-def parse_list(param_name: str, type):
+def parse_list(param_name: str, type, optional: bool = False):
     def parse(request: Request):
         try:
             value = request.query_params[param_name]
             if value:
                 return [type(x) for x in value.split(",")]
-            return []
         except ValueError:
             raise HTTPException(
                 status_code=400,
                 detail=f"Wrong item type. All items must be of type {type!r}",
             )
         except KeyError:
-            raise HTTPException(
-                status_code=400, detail=f"Missing parameter: {param_name!r}"
-            )
+            if not optional:
+                raise HTTPException(
+                    status_code=400, detail=f"Missing parameter: {param_name!r}"
+                )
+        return []
 
     return parse
 
@@ -191,7 +192,9 @@ async def preferences_from_platform(
 )
 def recommend(
     genres: List[str] = Depends(parse_list("genres", type=str)),
-    artists: List[str] = Depends(parse_list("artists", type=str)),
+    artists: Optional[List[str]] = Depends(
+        parse_list("artists", type=str, optional=True)
+    ),
     song_type: SongType = SongType.any,
 ):
     """Get recommender's genres or get a user's genres based on age.
