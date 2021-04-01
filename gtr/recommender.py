@@ -93,6 +93,7 @@ class Recommender:
             en.drop(columns=["download_url"]), fa, how="outer"
         )
         self.songs.replace({np.NaN: None}, inplace=True)
+        self.num_songs = len(self.songs)
 
         # Read artists
         logger.debug("Reading artists from CSV files")
@@ -403,14 +404,18 @@ class Recommender:
                     .flatten()
                     .sum()
                 )
-                if artist.name.values[0] in user_artists_names:
+                if artist.name.values[0] in user_artists_names:  # pragma: no cover
                     cosine_similarity += 1
                 cosine_similarities.append((index, cosine_similarity))
             cosine_similarities.sort(key=lambda x: x[1], reverse=True)
             hits = []
             for row in cosine_similarities:
                 id = selected[row[0]]
-                song = self.song(id)
+                try:
+                    song = self.song(id)
+                except IndexError:  # pragma: no cover
+                    logger.error("Index error for %d", id)
+                    continue
                 if is_valid(song):
                     hits.append(song)
                 if len(hits) == 5:
@@ -418,7 +423,11 @@ class Recommender:
         else:
             hits = []
             for index in selected:
-                song = self.song(index)
+                try:
+                    song = self.song(index)
+                except IndexError:  # pragma: no cover
+                    logger.error("Index error for %d", index)
+                    continue
                 if is_valid(song):
                     hits.append(song)
                 if len(hits) == 5:

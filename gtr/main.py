@@ -1,14 +1,23 @@
+import json
 import logging
 from typing import Dict, List, Optional
 
 import lyricsgenius as lg
 import tekore as tk
 from fastapi import Depends, FastAPI, HTTPException, Path, Query, Request
+from fastapi.responses import JSONResponse
+from ratelimit import Rule
+from ratelimit.auths import EmptyInformation
+from ratelimit.backends.redis import RedisBackend
 
+from gtr.auth import CustomRateLimitMiddleware, create_jwt_auth
 from gtr.constants import (
     GENIUS_CLIENT_ID,
     GENIUS_CLIENT_SECRET,
     GENIUS_REDIRECT_URI,
+    HASH_ALGORITHM,
+    REDIS_URL,
+    SECRET_KEY,
     SPOTIFY_CLIENT_ID,
     SPOTIFY_CLIENT_SECRET,
     SPOTIFY_REDIRECT_URI,
@@ -30,7 +39,45 @@ formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
 ch.setFormatter(formatter)
 logger.addHandler(ch)
 
+
+async def http_429_handler(scope, receive, send) -> None:
+    body = json.dumps({"detail": "Too many requests"}).encode("utf8")
+    headers = [
+        (b"content-length", str(len(body)).encode("utf8")),
+        (b"content-type", b"application/json"),
+    ]
+    await send({"type": "http.response.start", "status": 429, "headers": headers})
+    await send({"type": "http.response.body", "body": body, "more_body": False})
+
+
+redis_password, redis_socket = REDIS_URL.replace("redis://:", "").split("@")
+redis_host, redis_port = redis_socket.split(":")
+redis_port = int(redis_port)
 app = FastAPI()
+app.add_middleware(
+    CustomRateLimitMiddleware,
+    authenticate=create_jwt_auth(key=SECRET_KEY, algorithms=[HASH_ALGORITHM]),
+    backend=RedisBackend(host=redis_host, port=redis_port, password=redis_password),
+    config={
+        r"^/$": [Rule(second=5, group="default"), Rule(group="unlimited")],
+        r"^/genres.*": [Rule(second=5, group="default"), Rule(group="unlimited")],
+        r"^/artists$": [Rule(second=2, group="default"), Rule(group="unlimited")],
+        r"^/artists/[0-9]+$": [
+            Rule(second=2, group="default"),
+            Rule(group="unlimited"),
+        ],
+        r"^/preferences.*": [Rule(second=1, group="default"), Rule(group="unlimited")],
+        r"^/recommendations.*": [
+            Rule(second=2, group="default"),
+            Rule(group="unlimited"),
+        ],
+        r"^/search/.*": [Rule(second=2, group="default"), Rule(group="unlimited")],
+        r"^/songs/[0-9]+$": [Rule(second=3, group="default"), Rule(group="unlimited")],
+        r"^/songs$": [Rule(second=2, group="default"), Rule(group="unlimited")],
+        r"^/songs/len$": [Rule(second=2, group="default"), Rule(group="unlimited")],
+    },
+    on_blocked=http_429_handler,
+)
 recommender = Recommender()
 genius_auth = lg.OAuth2.full_code_exchange(
     GENIUS_CLIENT_ID,
@@ -38,8 +85,6 @@ genius_auth = lg.OAuth2.full_code_exchange(
     GENIUS_CLIENT_SECRET,
     scope=("me", "vote"),
 )
-# print(lg.OAuth2(client_id="asd", client_secret="asd", redirect_uri="asd"))
-# exit()
 spotify_auth = tk.RefreshingCredentials(
     SPOTIFY_CLIENT_ID,
     SPOTIFY_CLIENT_SECRET,
@@ -47,22 +92,23 @@ spotify_auth = tk.RefreshingCredentials(
 )
 
 
-def parse_list(param_name: str, type):
+def parse_list(param_name: str, type, optional: bool = False):
     def parse(request: Request):
         try:
             value = request.query_params[param_name]
             if value:
                 return [type(x) for x in value.split(",")]
-            return []
         except ValueError:
             raise HTTPException(
                 status_code=400,
                 detail=f"Wrong item type. All items must be of type {type!r}",
             )
         except KeyError:
-            raise HTTPException(
-                status_code=400, detail=f"Missing parameter: {param_name!r}"
-            )
+            if not optional:
+                raise HTTPException(
+                    status_code=400, detail=f"Missing parameter: {param_name!r}"
+                )
+        return []
 
     return parse
 
@@ -191,7 +237,9 @@ async def preferences_from_platform(
 )
 def recommend(
     genres: List[str] = Depends(parse_list("genres", type=str)),
-    artists: List[str] = Depends(parse_list("artists", type=str)),
+    artists: Optional[List[str]] = Depends(
+        parse_list("artists", type=str, optional=True)
+    ),
     song_type: SongType = SongType.any,
 ):
     """Get recommender's genres or get a user's genres based on age.
@@ -261,6 +309,18 @@ def search_artists(q: str = Query(..., title="Artist name", example="Eminem")):
 # def search_songs(q: str = Query(..., title="Song name", example="Rap God")):
 #    """Search recommender's songs."""
 #    return {"hits": recommender.search_song(q)}
+
+
+@app.get(
+    "/songs/len",
+    summary="Number of songs in the recommender",
+    response_model=Dict[str, int],
+    tags=["songs"],
+    response_description="Number of songs",
+)
+def len_songs():
+    """Get the number of songs available in the recommender."""
+    return {"len": recommender.num_songs}
 
 
 @app.get(
