@@ -404,7 +404,7 @@ class Recommender:
                     .flatten()
                     .sum()
                 )
-                if artist.name.values[0] in user_artists_names:
+                if artist.name.values[0] in user_artists_names:  # pragma: no cover
                     cosine_similarity += 1
                 cosine_similarities.append((index, cosine_similarity))
             cosine_similarities.sort(key=lambda x: x[1], reverse=True)
