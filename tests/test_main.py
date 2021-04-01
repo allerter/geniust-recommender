@@ -269,6 +269,12 @@ class TestAPI:
         assert response.status_code == 200
         assert type(response_dict["len"]) is int
 
+    def test_auth_in_query(self, client, token):
+        response = client.get("/songs/len", params={"access_token": token})
+        response_dict = response.json()
+        assert response.status_code == 200
+        assert type(response_dict["len"]) is int
+
     def test_missing_auth(self, client):
         response = client.get("/", headers=None)
         response_dict = response.json()

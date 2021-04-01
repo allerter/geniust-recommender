@@ -1,5 +1,6 @@
 from json.decoder import JSONDecodeError
 from typing import Awaitable, Callable, List, Tuple, Union
+from urllib.parse import parse_qs
 
 import jwt
 from fastapi.responses import JSONResponse
@@ -54,10 +55,11 @@ def create_jwt_auth(
                     raise BadInformation(scope, "Invalid token")
                 break
         else:
-            authorization = None
-
-        if not authorization:
-            raise EmptyInformation(scope, "Unauthorized access")
+            parameters = parse_qs(scope["query_string"])
+            token = parameters.get(b"access_token")
+            if token is None:
+                raise EmptyInformation(scope, "Unauthorized access")
+            authorization = f"Bearer {token[0].decode('utf8')}"
 
         bad_header = False
         try:
