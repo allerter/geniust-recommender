@@ -411,7 +411,11 @@ class Recommender:
             hits = []
             for row in cosine_similarities:
                 id = selected[row[0]]
-                song = self.song(id)
+                try:
+                    song = self.song(id)
+                except IndexError:  # pragma: no cover
+                    logger.error("Index error for %d", id)
+                    continue
                 if is_valid(song):
                     hits.append(song)
                 if len(hits) == 5:
@@ -419,7 +423,11 @@ class Recommender:
         else:
             hits = []
             for index in selected:
-                song = self.song(index)
+                try:
+                    song = self.song(index)
+                except IndexError:  # pragma: no cover
+                    logger.error("Index error for %d", index)
+                    continue
                 if is_valid(song):
                     hits.append(song)
                 if len(hits) == 5:
