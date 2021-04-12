@@ -2,26 +2,14 @@ import json
 import logging
 from typing import Dict, List, Optional
 
-import lyricsgenius as lg
+import httpx
 import tekore as tk
 from fastapi import Depends, FastAPI, HTTPException, Path, Query, Request
-from fastapi.responses import JSONResponse
 from ratelimit import Rule
-from ratelimit.auths import EmptyInformation
 from ratelimit.backends.redis import RedisBackend
 
 from gtr.auth import CustomRateLimitMiddleware, create_jwt_auth
-from gtr.constants import (
-    GENIUS_CLIENT_ID,
-    GENIUS_CLIENT_SECRET,
-    GENIUS_REDIRECT_URI,
-    HASH_ALGORITHM,
-    REDIS_URL,
-    SECRET_KEY,
-    SPOTIFY_CLIENT_ID,
-    SPOTIFY_CLIENT_SECRET,
-    SPOTIFY_REDIRECT_URI,
-)
+from gtr.constants import HASH_ALGORITHM, REDIS_URL, SECRET_KEY
 from gtr.recommender import (
     Artist,
     Preferences,
@@ -79,17 +67,6 @@ app.add_middleware(
     on_blocked=http_429_handler,
 )
 recommender = Recommender()
-genius_auth = lg.OAuth2.full_code_exchange(
-    GENIUS_CLIENT_ID,
-    GENIUS_REDIRECT_URI,
-    GENIUS_CLIENT_SECRET,
-    scope=("me", "vote"),
-)
-spotify_auth = tk.RefreshingCredentials(
-    SPOTIFY_CLIENT_ID,
-    SPOTIFY_CLIENT_SECRET,
-    SPOTIFY_REDIRECT_URI,
-)
 
 
 def parse_list(param_name: str, type, optional: bool = False):
@@ -196,36 +173,36 @@ def genres(
     response_description="Preferences object",
 )
 async def preferences_from_platform(
-    genius_code: Optional[str] = None, spotify_code: Optional[str] = None
+    token: str,
+    platform: str = Query(..., regex="^(spotify|genius)$"),
 ):
     """Get user preferences (genres and artists)
     based on user's activity on platform.
     """
-    if not any((genius_code, spotify_code)):
-        raise HTTPException(
-            status_code=400,
-            detail="No code provided.",
-        )
-    elif genius_code:
-        token = genius_auth.get_user_token(code=genius_code)
-        platform = "genius"
+    if platform == "genius":
+        auth_header = {"Authorization": f"Bearer {token}"}
+        async with httpx.AsyncClient(headers=auth_header) as client:
+            r = await client.get("https://api.genius.com/account")
+            res = r.json()
+            if r.status_code == 401:
+                raise HTTPException(
+                    status_code=400, detail="Invalid token. " + res["error_description"]
+                )
     else:
-        token = await spotify_auth.request_user_token(spotify_code)
-        token = token.access_token
-        platform = "spotify"
+        spotify = tk.Spotify(token, asynchronous=True)
+        try:
+            await spotify.current_user()
+        except (tk.BadRequest, tk.Unauthorised) as e:  # pragma: no cover
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid token. " + e.response.content["error"]["message"],
+            )
+        await spotify.close()
 
-    if token is None:
-        raise HTTPException(
-            status_code=400,
-            detail="Failed to get the token.",
-        )
-    else:
-        pref = await recommender.preferences_from_platform(token, platform)
-        return {
-            "preferences": pref
-            if pref is not None
-            else Preferences(genres=[], artists=[])
-        }
+    pref = await recommender.preferences_from_platform(token, platform)
+    return {
+        "preferences": pref if pref is not None else Preferences(genres=[], artists=[])
+    }
 
 
 @app.get(
