@@ -54,12 +54,6 @@ jobs:
         redis-version: 6
     - name: Run tox
       env:
-        GENIUS_CLIENT_ID: ${{ secrets.GENIUS_CLIENT_ID }}
-        GENIUS_REDIRECT_URI: ${{ secrets.GENIUS_REDIRECT_URI }}
-        GENIUS_CLIENT_SECRET: ${{ secrets.GENIUS_CLIENT_SECRET }}
-        SPOTIFY_CLIENT_ID: ${{ secrets.SPOTIFY_CLIENT_ID }}
-        SPOTIFY_REDIRECT_URI: ${{ secrets.SPOTIFY_REDIRECT_URI }}
-        SPOTIFY_CLIENT_SECRET: ${{ secrets.SPOTIFY_CLIENT_SECRET }}
         LASTFM_API_KEY: ${{ secrets.LASTFM_API_KEY }}
         SECRET_KEY: TEST_KEY
         REDIS_URL: redis://:@127.0.0.1:6379
