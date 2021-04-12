@@ -8,3 +8,4 @@ uvicorn[standard]==0.13.4
 uvloop==0.15.2
 httptools==0.1.1
 asgi-ratelimit[full]==0.4.0
+httpx>=0.17.1,<0.18.0

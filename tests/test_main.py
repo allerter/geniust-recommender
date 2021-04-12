@@ -1,8 +1,6 @@
 from unittest.mock import create_autospec, patch
 
-import lyricsgenius as lg
 import pytest
-import tekore as tk
 
 from gtr.recommender import Preferences, Recommender
 
@@ -91,27 +89,40 @@ class TestAPI:
 
     @pytest.mark.parametrize("platform", ["genius", "spotify"])
     @pytest.mark.parametrize("result", [Preferences(genres=["pop"], artists=[]), None])
-    def test_preferences_from_platform(self, client, auth_header, platform, result):
+    def test_preferences_from_platform(
+        self,
+        client,
+        auth_header,
+        platform,
+        result,
+        httpx_mock,
+    ):
         recommender = create_autospec(Recommender)
         recommender.preferences_from_platform.return_value = result
         # Mock genius and spotify token responses
         if platform == "genius":
-            OAuth2 = create_autospec(lg.OAuth2)
-            OAuth2.get_user_token.return_value = "test_token"
-            RefreshingCredentials = None
+            res = {"account": {"id": "1"}}
         else:
-            RefreshingCredentials = create_autospec(tk.RefreshingCredentials)
-            token = create_autospec(tk.RefreshingToken)
-            token.access_token = "test_token"
-            RefreshingCredentials.request_user_token.return_value = get_mock_coro(token)
-            OAuth2 = None
+            res = {
+                "country": "XX",
+                "display_name": "example",
+                "email": "example@example.com",
+                "explicit_content": {"filter_enabled": False, "filter_locked": False},
+                "external_urls": {"spotify": "https://open.spotify.com/user/example"},
+                "followers": {"href": None, "total": 0},
+                "href": "https://api.spotify.com/v1/users/example",
+                "id": "example",
+                "images": [],
+                "product": "open",
+                "type": "user",
+                "uri": "spotify:user:example",
+            }
+        httpx_mock.add_response(json=res)
 
-        with patch("gtr.main.recommender", recommender), patch(
-            "gtr.main.genius_auth", OAuth2
-        ), patch("gtr.main.spotify_auth", RefreshingCredentials):
+        with patch("gtr.main.recommender", recommender):
             response = client.get(
                 "/preferences",
-                params={f"{platform}_code": "test_code"},
+                params={"platform": platform, "token": "test_token"},
                 headers=auth_header,
             )
         response_dict = response.json()
@@ -123,35 +134,44 @@ class TestAPI:
             assert response_dict["preferences"]["genres"] == []
             assert response_dict["preferences"]["artists"] == []
 
-    def test_preferences_from_platform_no_code(self, client, auth_header):
+    def test_preferences_from_platform_missing_params(self, client, auth_header):
         response = client.get("/preferences", headers=auth_header)
         response_dict = response.json()
 
-        assert response.status_code == 400
+        assert response.status_code == 422
         assert response_dict.get("preferences") is None
 
-    @pytest.mark.parametrize("platform", ["genius", "spotify"])
-    def test_preferences_from_platform_no_token(self, client, auth_header, platform):
-        # Mock genius and spotify token responses
-        if platform == "genius":
-            OAuth2 = create_autospec(lg.OAuth2)
-            OAuth2.get_user_token.return_value = None
-            RefreshingCredentials = None
-        else:
-            RefreshingCredentials = create_autospec(tk.RefreshingCredentials)
-            token = create_autospec(tk.RefreshingToken)
-            token.access_token = None
-            RefreshingCredentials.request_user_token.return_value = get_mock_coro(token)
-            OAuth2 = None
+    def test_preferences_from_platform_invalid_platform(self, client, auth_header):
+        response = client.get(
+            "/preferences",
+            params={"platform": "invalid", "token": "test_token"},
+            headers=auth_header,
+        )
+        response_dict = response.json()
 
-        with patch("gtr.main.genius_auth", OAuth2), patch(
-            "gtr.main.spotify_auth", RefreshingCredentials
-        ):
-            response = client.get(
-                "/preferences",
-                params={f"{platform}_code": "test_code"},
-                headers=auth_header,
-            )
+        assert response.status_code == 422
+        assert response_dict.get("preferences") is None
+
+    @pytest.mark.parametrize("platform", ["genius"])
+    def test_preferences_from_platform_invalid_token(
+        self,
+        client,
+        auth_header,
+        platform,
+        httpx_mock,
+    ):
+        # Mock genius response
+        res = {
+            "error": "invalid_token",
+            "error_description": "The access token provided is...",
+        }
+        httpx_mock.add_response(status_code=401, json=res)
+
+        response = client.get(
+            "/preferences",
+            params={"platform": platform, "token": "test_token"},
+            headers=auth_header,
+        )
         response_dict = response.json()
 
         assert response.status_code == 400
