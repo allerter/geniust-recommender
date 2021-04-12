@@ -196,36 +196,18 @@ def genres(
     response_description="Preferences object",
 )
 async def preferences_from_platform(
-    genius_code: Optional[str] = None, spotify_code: Optional[str] = None
+    token: str,
+    platform: str = Query(..., regex="^(spotify|genius)$"),
 ):
     """Get user preferences (genres and artists)
     based on user's activity on platform.
     """
-    if not any((genius_code, spotify_code)):
-        raise HTTPException(
-            status_code=400,
-            detail="No code provided.",
-        )
-    elif genius_code:
-        token = genius_auth.get_user_token(code=genius_code)
-        platform = "genius"
-    else:
-        token = await spotify_auth.request_user_token(spotify_code)
-        token = token.access_token
-        platform = "spotify"
-
-    if token is None:
-        raise HTTPException(
-            status_code=400,
-            detail="Failed to get the token.",
-        )
-    else:
-        pref = await recommender.preferences_from_platform(token, platform)
-        return {
-            "preferences": pref
-            if pref is not None
-            else Preferences(genres=[], artists=[])
-        }
+    pref = await recommender.preferences_from_platform(token, platform)
+    return {
+        "preferences": pref
+        if pref is not None
+        else Preferences(genres=[], artists=[])
+    }
 
 
 @app.get(
