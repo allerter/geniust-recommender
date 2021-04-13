@@ -52,6 +52,18 @@ class Preferences(BaseModel):
         )
 
 
+class SimpleSong(BaseModel):
+    """A song without full info"""
+
+    id: int
+    name: str
+    artist: str
+    cover_art: Optional[str]
+
+    def __repr__(self) -> str:
+        return f"SimpleSong(id={self.id})"
+
+
 class Song(BaseModel):
     """A Song from the Recommender"""
 
@@ -105,6 +117,18 @@ class Recommender:
         )
         self._artists.description.fillna("", inplace=True)
 
+        logger.debug("Creating search dictionaries")
+        simple_song_columns = ["name", "artist", "cover_art"]
+        self.songs_names: np.ndarray = self._songs[simple_song_columns].values
+        self.lowered_songs_names: Dict[str, Dict[str, Union[None, str, int]]] = {
+            values[0].lower(): {
+                "id": i,
+                "name": values[0],
+                "artist": values[1],
+                "cover_art": values[2],
+            }
+            for i, values in enumerate(self.songs_names)
+        }
         self.artists_names: List[str] = self._artists.name.to_list()
         self.lowered_artists_names: Dict[str, Dict[str, Union[int, str]]] = {
             name.lower(): {
@@ -301,8 +325,18 @@ class Recommender:
         matches = difflib.get_close_matches(artist, self.lowered_artists_names.keys())
         return [SimpleArtist(**self.lowered_artists_names[m]) for m in matches]
 
-    # def search_song(self, song: str):
-    #     raise NotImplementedError()
+    def search_song(self, song: str) -> List[SimpleSong]:
+        """Searches for song in song
+
+        Args:
+            song (str): Song .
+
+        Returns:
+            List[SimpleSong]: List of possible matches.
+        """
+        song = song.lower()
+        matches = difflib.get_close_matches(song, self.lowered_songs_names.keys(), n=10)
+        return [SimpleSong(**self.lowered_songs_names[m]) for m in matches]
 
     def binarize(self, genres: List[str]) -> np.ndarray:
         """Converts genres to an array of ones and zeroes.
