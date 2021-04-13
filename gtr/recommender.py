@@ -467,6 +467,9 @@ class Recommender:
                 try:
                     song = self.song(id)
                 except IndexError:  # pragma: no cover
+                    # TODO: after fixing the IndexError,
+                    # replace self.song with self._songs
+                    # and merge this loop with the one below
                     logger.error("Index error for %d", id)
                     continue
                 if is_valid(song):
