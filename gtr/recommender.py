@@ -535,8 +535,29 @@ class Recommender:
             id = int(series.index[0])
             row = series.values[0]
         return self._row_to_song(id, *row)
+
+    def songs(
+        self, ids: Optional[List[int]] = None, ids_spotify: Optional[List[str]] = None
+    ) -> List[Song]:
+        """Gets Songs
+
+        You must pass either ids or ids_spotify.
+
+        Args:
+            ids (list, optional): List of song IDs. Defaults to None.
+            ids_spotify (list, optional): List of Spotify IDs. Defaults to None.
+
+        Raises:
+            AssertionError: If neither ids nor ids_spotify is passed.
+            If both are supplied, ids is used.
+
+        Returns:
+            List[Song]: List of Songs.
+        """
+        if not any([ids is not None, ids_spotify]):
+            raise AssertionError("Must supply either ids or ids_spotify.")
+        if ids:
+            rows = self._songs.values[ids]
         else:
-            rows = self.songs[self.songs.id_spotify == id_spotify]
-            id = int(rows.index[0])
-            row = rows.iloc[0]
-        return Song(id=id, **row.to_dict())
+            rows = self._songs[self._songs.id_spotify.isin([ids_spotify])].values
+        return [self._row_to_song(ids[i], *row) for i, row in enumerate(rows)]
