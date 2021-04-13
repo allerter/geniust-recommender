@@ -68,12 +68,12 @@ class Song(BaseModel):
     """A Song from the Recommender"""
 
     id: int
-    artist: str
-    name: str
     genres: List[str]
     id_spotify: Optional[str]
-    isrc: Optional[str]
+    artist: str
+    name: str
     cover_art: Optional[str]
+    isrc: Optional[str]
     preview_url: Optional[str]
     download_url: Optional[str]
 
@@ -194,6 +194,9 @@ class Recommender:
         }
         logger.debug("Recommender initialization successful.")
 
+    def _row_to_artist(self, id: int, name: str, description: str) -> Artist:
+        return Artist(id=id, name=name, description=description)
+
     def artist(self, id: int) -> Artist:
         """Gets Artist
 
@@ -203,8 +206,8 @@ class Recommender:
         Returns:
             Artist: Artist info.
         """
-        row = self.artists.iloc[id]
-        return Artist(id=id, **row.to_dict())
+        row = self._artists.values[id]
+        return self._row_to_artist(id, *row)
 
     def genres_by_age(self, age: int) -> List[str]:
         """Returns genres based on age group
@@ -471,17 +474,41 @@ class Recommender:
 
         return hits
 
-    def song(self, id: int = None, id_spotify: str = None) -> Song:
+    def _row_to_song(
+        self,
+        id: int,
+        genres: List[str],
+        id_spotify: Optional[str],
+        artist: str,
+        name: str,
+        cover_art: Optional[str],
+        isrc: Optional[str],
+        preview_url: Optional[str],
+        download_url: Optional[str],
+    ) -> Song:
+        return Song(
+            id=id,
+            genres=genres,
+            id_spotify=id_spotify,
+            artist=artist,
+            name=name,
+            cover_art=cover_art,
+            isrc=isrc,
+            preview_url=preview_url,
+            download_url=download_url,
+        )
+
+    def song(self, id: Optional[int] = None, id_spotify: Optional[str] = None) -> Song:
         """Gets Song from its ID or Spotify ID
 
-        You must pass either id or spotify_id.
+        You must pass either id or id_spotify.
 
         Args:
             id (int, optional): Song ID. Defaults to None.
             id_spotify (str, optional): Song's Spotify ID. Defaults to None.
 
         Raises:
-            AssertionError: If neither id nor spotify_id is passed.
+            AssertionError: If neither id nor id_spotify is passed.
             If both are supplied, id is used.
 
         Returns:
@@ -489,8 +516,13 @@ class Recommender:
         """
         if not any([id is not None, id_spotify]):
             raise AssertionError("Must supply either id or id_spotify.")
-        if id:
-            row = self.songs.iloc[id]
+        if id is not None:
+            row = self._songs.values[id]
+        else:
+            series = self._songs[self._songs.id_spotify.isin([id_spotify])]
+            id = int(series.index[0])
+            row = series.values[0]
+        return self._row_to_song(id, *row)
         else:
             rows = self.songs[self.songs.id_spotify == id_spotify]
             id = int(rows.index[0])
