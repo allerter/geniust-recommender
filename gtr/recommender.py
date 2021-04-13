@@ -2,7 +2,7 @@ import difflib
 import logging
 from enum import Enum
 from os.path import join
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 
 import httpx
 import lyricsgenius as lg
@@ -26,7 +26,7 @@ class SimpleArtist(BaseModel):
     id: int
     name: str
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"SimpleArtist(id={self.id})"
 
 
@@ -35,7 +35,7 @@ class Artist(SimpleArtist):
 
     description: str
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"Artist(id={self.id})"
 
 
@@ -45,7 +45,7 @@ class Preferences(BaseModel):
     genres: List[str]
     artists: List[str]
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "Preferences(genres=[{genres}], artists=[{artists}])".format(
             genres=", ".join(self.genres),
             artists=", ".join(self.artists),
@@ -65,7 +65,7 @@ class Song(BaseModel):
     preview_url: Optional[str]
     download_url: Optional[str]
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"Song(id={self.id})"
 
 
@@ -84,7 +84,7 @@ class Recommender:
     classical,  country, instrumental, persian, pop, rap, rnb, rock, traditional
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         # Read tracks
         logger.debug("Reading songs from CSV files")
         en = pd.read_csv(join(data_path, "tracks en.csv"))
@@ -318,7 +318,7 @@ class Recommender:
         self,
         user_preferences: Preferences,
         # language: str = 'any',
-        song_type="any",
+        song_type: str = "any",
     ) -> List[Song]:
         """Generates song recommendations based on preferences
 
