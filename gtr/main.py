@@ -1,12 +1,14 @@
 import json
 import logging
 from typing import Dict, List, Optional
+from typing import Callable, Dict, List, Optional, Type, Union
 
 import httpx
 import tekore as tk
 from fastapi import Depends, FastAPI, HTTPException, Path, Query, Request
 from ratelimit import Rule
 from ratelimit.backends.redis import RedisBackend
+from ratelimit.types import Receive, Scope, Send
 
 from gtr.auth import CustomRateLimitMiddleware, create_jwt_auth
 from gtr.constants import HASH_ALGORITHM, REDIS_URL, SECRET_KEY
@@ -29,6 +31,7 @@ logger.addHandler(ch)
 
 
 async def http_429_handler(scope, receive, send) -> None:
+async def http_429_handler(scope: Scope, receive: Receive, send: Send) -> None:
     body = json.dumps({"detail": "Too many requests"}).encode("utf8")
     headers = [
         (b"content-length", str(len(body)).encode("utf8")),
@@ -70,6 +73,9 @@ recommender = Recommender()
 
 
 def parse_list(param_name: str, type, optional: bool = False):
+def parse_list(
+    param_name: str, type: Type[Union[int, str]], optional: bool = False
+) -> Callable[..., Request]:
     def parse(request: Request):
         try:
             value = request.query_params[param_name]
@@ -329,6 +335,7 @@ def song(
     response_description="List of Song objects",
 )
 def songs(ids=Depends(parse_list("ids", type=int))):
+def songs(ids: List[int] = Depends(parse_list("ids", type=int))):
     """Get more than one song using a comma-separated list.
 
     Limit: 10
