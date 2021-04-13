@@ -334,10 +334,12 @@ class Recommender:
             artist (str): Artist.
 
         Returns:
-            List[str]: List of possible matches.
+            List[SimpleArtist]: List of possible matches.
         """
         artist = artist.lower()
-        matches = difflib.get_close_matches(artist, self.lowered_artists_names.keys())
+        matches = difflib.get_close_matches(
+            artist, self.lowered_artists_names.keys(), n=10
+        )
         return [SimpleArtist(**self.lowered_artists_names[m]) for m in matches]
 
     def search_song(self, song: str) -> List[SimpleSong]:
