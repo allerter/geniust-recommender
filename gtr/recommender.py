@@ -209,6 +209,18 @@ class Recommender:
         row = self._artists.values[id]
         return self._row_to_artist(id, *row)
 
+    def artists(self, ids: List[int]) -> List[Artist]:
+        """Gets Artist
+
+        Args:
+            ids (List[int]): List of Artist IDs.
+
+        Returns:
+            List[Artist]: List of Artists.
+        """
+        rows = self._artists.values[ids]
+        return [self._row_to_artist(ids[i], *row) for i, row in enumerate(rows)]
+
     def genres_by_age(self, age: int) -> List[str]:
         """Returns genres based on age group
 
