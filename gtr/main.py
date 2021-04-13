@@ -16,6 +16,7 @@ from gtr.recommender import (
     Preferences,
     Recommender,
     SimpleArtist,
+    SimpleSong,
     Song,
     SongType,
 )
@@ -279,16 +280,16 @@ def search_artists(q: str = Query(..., title="Artist name", example="Eminem")):
     return {"hits": recommender.search_artist(q)}
 
 
-# @app.get(
-#    "/search/songs",
-#    summary="Search songs",
-#    response_model=Dict[str, List[Song]],
-#    tags=["search"],
-#    response_description="List of Song objects",
-# )
-# def search_songs(q: str = Query(..., title="Song name", example="Rap God")):
-#    """Search recommender's songs."""
-#    return {"hits": recommender.search_song(q)}
+@app.get(
+    "/search/songs",
+    summary="Search songs",
+    response_model=Dict[str, List[SimpleSong]],
+    tags=["search"],
+    response_description="List of Song objects",
+)
+def search_songs(q: str = Query(..., title="Song name", example="Rap God")):
+    """Search recommender's songs."""
+    return {"hits": recommender.search_song(q)}
 
 
 @app.get(
