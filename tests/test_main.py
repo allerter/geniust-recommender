@@ -235,6 +235,13 @@ class TestAPI:
         assert response.status_code == 200
         assert response_dict["hits"][0]["name"] == name
 
+    def test_search_song(self, client, auth_header):
+        name = "Hallucinate"
+        response = client.get("/search/songs", params={"q": name}, headers=auth_header)
+        response_dict = response.json()
+        assert response.status_code == 200
+        assert response_dict["hits"][0]["name"] == name
+
     def test_song(self, client, auth_header):
         song_id = 1
         response = client.get(f"/songs/{song_id}", headers=auth_header)

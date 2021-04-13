@@ -2,7 +2,7 @@ import difflib
 import logging
 from enum import Enum
 from os.path import join
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union
 
 import httpx
 import lyricsgenius as lg
@@ -26,7 +26,7 @@ class SimpleArtist(BaseModel):
     id: int
     name: str
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"SimpleArtist(id={self.id})"
 
 
@@ -35,7 +35,7 @@ class Artist(SimpleArtist):
 
     description: str
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"Artist(id={self.id})"
 
 
@@ -45,27 +45,39 @@ class Preferences(BaseModel):
     genres: List[str]
     artists: List[str]
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return "Preferences(genres=[{genres}], artists=[{artists}])".format(
             genres=", ".join(self.genres),
             artists=", ".join(self.artists),
         )
 
 
+class SimpleSong(BaseModel):
+    """A song without full info"""
+
+    id: int
+    name: str
+    artist: str
+    cover_art: Optional[str]
+
+    def __repr__(self) -> str:
+        return f"SimpleSong(id={self.id})"
+
+
 class Song(BaseModel):
     """A Song from the Recommender"""
 
     id: int
-    artist: str
-    name: str
     genres: List[str]
     id_spotify: Optional[str]
-    isrc: Optional[str]
+    artist: str
+    name: str
     cover_art: Optional[str]
+    isrc: Optional[str]
     preview_url: Optional[str]
     download_url: Optional[str]
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"Song(id={self.id})"
 
 
@@ -84,27 +96,41 @@ class Recommender:
     classical,  country, instrumental, persian, pop, rap, rnb, rock, traditional
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         # Read tracks
         logger.debug("Reading songs from CSV files")
         en = pd.read_csv(join(data_path, "tracks en.csv"))
         fa = pd.read_csv(join(data_path, "tracks fa.csv"))
-        self.songs: pd.DataFrame = pd.merge(
+        self._songs: pd.DataFrame = pd.merge(
             en.drop(columns=["download_url"]), fa, how="outer"
         )
-        self.songs.replace({np.NaN: None}, inplace=True)
-        self.num_songs = len(self.songs)
+        self._songs.replace({np.NaN: None}, inplace=True)
+        self.num_songs = len(self._songs)
 
         # Read artists
         logger.debug("Reading artists from CSV files")
         en_artists = pd.read_csv(join(data_path, "artists en.csv"))
         fa_artists = pd.read_csv(join(data_path, "artists fa.csv"))
-        self.artists: pd.DataFrame = pd.merge(en_artists, fa_artists, how="outer")
-        self.artists["description"] = self.artists["description"].str.replace(r"\n", "")
-        self.artists.description.fillna("", inplace=True)
+        self._artists: pd.DataFrame = pd.merge(en_artists, fa_artists, how="outer")
+        self._artists["description"] = self._artists["description"].str.replace(
+            r"\n", ""
+        )
+        self._artists.description.fillna("", inplace=True)
 
-        self.artists_names = self.artists.name.to_list()
-        self.lowered_artists_names = {
+        logger.debug("Creating search dictionaries")
+        simple_song_columns = ["name", "artist", "cover_art"]
+        self.songs_names: np.ndarray = self._songs[simple_song_columns].values
+        self.lowered_songs_names: Dict[str, Dict[str, Union[None, str, int]]] = {
+            values[0].lower(): {
+                "id": i,
+                "name": values[0],
+                "artist": values[1],
+                "cover_art": values[2],
+            }
+            for i, values in enumerate(self.songs_names)
+        }
+        self.artists_names: List[str] = self._artists.name.to_list()
+        self.lowered_artists_names: Dict[str, Dict[str, Union[int, str]]] = {
             name.lower(): {
                 "id": i,
                 "name": name,
@@ -116,8 +142,8 @@ class Recommender:
         # ).value_counts().all(False)
         # assert no_duplicates, True
 
-        self.songs["genres"] = self.songs["genres"].str.split(",")
-        songs_copy = self.songs.copy()
+        self._songs["genres"] = self._songs["genres"].str.split(",")
+        songs_copy = self._songs.copy()
         # One-hot encode genres
         logger.debug("One-hot encoding genres")
         mlb = MultiLabelBinarizer(sparse_output=True)
@@ -153,7 +179,7 @@ class Recommender:
             PERSIAN_STOP_WORDS = f.read().strip().split()
         stop_words = list(ENGLISH_STOP_WORDS) + PERSIAN_STOP_WORDS
         self.tfidf = TfidfVectorizer(analyzer="word", stop_words=stop_words)
-        self.tfidf = self.tfidf.fit_transform(self.artists["description"])
+        self.tfidf = self.tfidf.fit_transform(self._artists["description"])
 
         # based on https://www.statista.com/statistics/253915/
         # favorite-music-genres-in-the-us/
@@ -168,6 +194,9 @@ class Recommender:
         }
         logger.debug("Recommender initialization successful.")
 
+    def _row_to_artist(self, id: int, name: str, description: str) -> Artist:
+        return Artist(id=id, name=name, description=description)
+
     def artist(self, id: int) -> Artist:
         """Gets Artist
 
@@ -177,8 +206,20 @@ class Recommender:
         Returns:
             Artist: Artist info.
         """
-        row = self.artists.iloc[id]
-        return Artist(id=id, **row.to_dict())
+        row = self._artists.values[id]
+        return self._row_to_artist(id, *row)
+
+    def artists(self, ids: List[int]) -> List[Artist]:
+        """Gets Artist
+
+        Args:
+            ids (List[int]): List of Artist IDs.
+
+        Returns:
+            List[Artist]: List of Artists.
+        """
+        rows = self._artists.values[ids]
+        return [self._row_to_artist(ids[i], *row) for i, row in enumerate(rows)]
 
     def genres_by_age(self, age: int) -> List[str]:
         """Returns genres based on age group
@@ -278,7 +319,7 @@ class Recommender:
         # find user artists in recommender artists
         if user_genres:
             for artist in artists:
-                found_artist = self.artists[self.artists.name == artist].name.values
+                found_artist = self._artists[self._artists.name == artist].name.values
                 if found_artist.size > 0:
                     found_artists.append(found_artist[0])
 
@@ -293,14 +334,26 @@ class Recommender:
             artist (str): Artist.
 
         Returns:
-            List[str]: List of possible matches.
+            List[SimpleArtist]: List of possible matches.
         """
         artist = artist.lower()
-        matches = difflib.get_close_matches(artist, self.lowered_artists_names.keys())
+        matches = difflib.get_close_matches(
+            artist, self.lowered_artists_names.keys(), n=10
+        )
         return [SimpleArtist(**self.lowered_artists_names[m]) for m in matches]
 
-    # def search_song(self, song: str):
-    #     raise NotImplementedError()
+    def search_song(self, song: str) -> List[SimpleSong]:
+        """Searches for song in song
+
+        Args:
+            song (str): Song .
+
+        Returns:
+            List[SimpleSong]: List of possible matches.
+        """
+        song = song.lower()
+        matches = difflib.get_close_matches(song, self.lowered_songs_names.keys(), n=10)
+        return [SimpleSong(**self.lowered_songs_names[m]) for m in matches]
 
     def binarize(self, genres: List[str]) -> np.ndarray:
         """Converts genres to an array of ones and zeroes.
@@ -318,7 +371,7 @@ class Recommender:
         self,
         user_preferences: Preferences,
         # language: str = 'any',
-        song_type="any",
+        song_type: str = "any",
     ) -> List[Song]:
         """Generates song recommendations based on preferences
 
@@ -387,12 +440,12 @@ class Recommender:
 
         # sort songs by most similar song artists to user artists
         user_artists = [
-            self.artists[self.artists.name == artist]
+            self._artists[self._artists.name == artist]
             for artist in user_preferences.artists
         ]
         if user_artists:
             song_artists = [
-                self.artists[self.artists.name == self.songs.loc[song].artist]
+                self._artists[self._artists.name == self._songs.loc[song].artist]
                 for song in selected
             ]
             cosine_similarities = []
@@ -414,6 +467,9 @@ class Recommender:
                 try:
                     song = self.song(id)
                 except IndexError:  # pragma: no cover
+                    # TODO: after fixing the IndexError,
+                    # replace self.song with self._songs
+                    # and merge this loop with the one below
                     logger.error("Index error for %d", id)
                     continue
                 if is_valid(song):
@@ -435,17 +491,41 @@ class Recommender:
 
         return hits
 
-    def song(self, id: int = None, id_spotify: str = None) -> Song:
+    def _row_to_song(
+        self,
+        id: int,
+        genres: List[str],
+        id_spotify: Optional[str],
+        artist: str,
+        name: str,
+        cover_art: Optional[str],
+        isrc: Optional[str],
+        preview_url: Optional[str],
+        download_url: Optional[str],
+    ) -> Song:
+        return Song(
+            id=id,
+            genres=genres,
+            id_spotify=id_spotify,
+            artist=artist,
+            name=name,
+            cover_art=cover_art,
+            isrc=isrc,
+            preview_url=preview_url,
+            download_url=download_url,
+        )
+
+    def song(self, id: Optional[int] = None, id_spotify: Optional[str] = None) -> Song:
         """Gets Song from its ID or Spotify ID
 
-        You must pass either id or spotify_id.
+        You must pass either id or id_spotify.
 
         Args:
             id (int, optional): Song ID. Defaults to None.
             id_spotify (str, optional): Song's Spotify ID. Defaults to None.
 
         Raises:
-            AssertionError: If neither id nor spotify_id is passed.
+            AssertionError: If neither id nor id_spotify is passed.
             If both are supplied, id is used.
 
         Returns:
@@ -453,10 +533,36 @@ class Recommender:
         """
         if not any([id is not None, id_spotify]):
             raise AssertionError("Must supply either id or id_spotify.")
-        if id:
-            row = self.songs.iloc[id]
+        if id is not None:
+            row = self._songs.values[id]
         else:
-            rows = self.songs[self.songs.id_spotify == id_spotify]
-            id = int(rows.index[0])
-            row = rows.iloc[0]
-        return Song(id=id, **row.to_dict())
+            series = self._songs[self._songs.id_spotify.isin([id_spotify])]
+            id = int(series.index[0])
+            row = series.values[0]
+        return self._row_to_song(id, *row)
+
+    def songs(
+        self, ids: Optional[List[int]] = None, ids_spotify: Optional[List[str]] = None
+    ) -> List[Song]:
+        """Gets Songs
+
+        You must pass either ids or ids_spotify.
+
+        Args:
+            ids (list, optional): List of song IDs. Defaults to None.
+            ids_spotify (list, optional): List of Spotify IDs. Defaults to None.
+
+        Raises:
+            AssertionError: If neither ids nor ids_spotify is passed.
+            If both are supplied, ids is used.
+
+        Returns:
+            List[Song]: List of Songs.
+        """
+        if not any([ids is not None, ids_spotify]):
+            raise AssertionError("Must supply either ids or ids_spotify.")
+        if ids:
+            rows = self._songs.values[ids]
+        else:
+            rows = self._songs[self._songs.id_spotify.isin([ids_spotify])].values
+        return [self._row_to_song(ids[i], *row) for i, row in enumerate(rows)]

@@ -1,12 +1,13 @@
 import json
 import logging
-from typing import Dict, List, Optional
+from typing import Callable, Dict, List, Optional, Type, Union
 
 import httpx
 import tekore as tk
 from fastapi import Depends, FastAPI, HTTPException, Path, Query, Request
 from ratelimit import Rule
 from ratelimit.backends.redis import RedisBackend
+from ratelimit.types import Receive, Scope, Send
 
 from gtr.auth import CustomRateLimitMiddleware, create_jwt_auth
 from gtr.constants import HASH_ALGORITHM, REDIS_URL, SECRET_KEY
@@ -15,6 +16,7 @@ from gtr.recommender import (
     Preferences,
     Recommender,
     SimpleArtist,
+    SimpleSong,
     Song,
     SongType,
 )
@@ -28,7 +30,7 @@ ch.setFormatter(formatter)
 logger.addHandler(ch)
 
 
-async def http_429_handler(scope, receive, send) -> None:
+async def http_429_handler(scope: Scope, receive: Receive, send: Send) -> None:
     body = json.dumps({"detail": "Too many requests"}).encode("utf8")
     headers = [
         (b"content-length", str(len(body)).encode("utf8")),
@@ -69,7 +71,9 @@ app.add_middleware(
 recommender = Recommender()
 
 
-def parse_list(param_name: str, type, optional: bool = False):
+def parse_list(
+    param_name: str, type: Type[Union[int, str]], optional: bool = False
+) -> Callable[..., Request]:
     def parse(request: Request):
         try:
             value = request.query_params[param_name]
@@ -131,7 +135,7 @@ def artists(ids: List[int] = Depends(parse_list("ids", type=int))):
     if len(ids) > 10:
         raise HTTPException(status_code=400, detail="IDs can't be more than 10.")
     try:
-        return {"artists": [recommender.artist(id=id) for id in ids]}
+        return {"artists": recommender.artists(ids=ids)}
     except IndexError:
         raise HTTPException(status_code=404, detail="One of the artists was not found.")
 
@@ -276,16 +280,16 @@ def search_artists(q: str = Query(..., title="Artist name", example="Eminem")):
     return {"hits": recommender.search_artist(q)}
 
 
-# @app.get(
-#    "/search/songs",
-#    summary="Search songs",
-#    response_model=Dict[str, List[Song]],
-#    tags=["search"],
-#    response_description="List of Song objects",
-# )
-# def search_songs(q: str = Query(..., title="Song name", example="Rap God")):
-#    """Search recommender's songs."""
-#    return {"hits": recommender.search_song(q)}
+@app.get(
+    "/search/songs",
+    summary="Search songs",
+    response_model=Dict[str, List[SimpleSong]],
+    tags=["search"],
+    response_description="List of Song objects",
+)
+def search_songs(q: str = Query(..., title="Song name", example="Rap God")):
+    """Search recommender's songs."""
+    return {"hits": recommender.search_song(q)}
 
 
 @app.get(
@@ -328,7 +332,7 @@ def song(
     tags=["songs"],
     response_description="List of Song objects",
 )
-def songs(ids=Depends(parse_list("ids", type=int))):
+def songs(ids: List[int] = Depends(parse_list("ids", type=int))):
     """Get more than one song using a comma-separated list.
 
     Limit: 10
@@ -336,6 +340,6 @@ def songs(ids=Depends(parse_list("ids", type=int))):
     if len(ids) > 10:
         raise HTTPException(status_code=400, detail="IDs can't be more than 10.")
     try:
-        return {"songs": [recommender.song(id=id) for id in ids]}
+        return {"songs": recommender.songs(ids)}
     except IndexError:
         raise HTTPException(status_code=404, detail="One of the song was not found")
