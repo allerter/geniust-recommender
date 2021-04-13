@@ -5,7 +5,7 @@ from urllib.parse import parse_qs
 import jwt
 from fastapi.responses import JSONResponse
 from ratelimit import RateLimitMiddleware
-from ratelimit.types import Scope
+from ratelimit.types import Receive, Scope, Send
 
 
 class EmptyInformation(Exception):  # noqa: B903
@@ -21,7 +21,7 @@ class BadInformation(Exception):  # noqa: B903
 
 
 class CustomRateLimitMiddleware(RateLimitMiddleware):
-    async def __call__(self, scope, receive, send):
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
         try:
             await super().__call__(scope, receive, send)
         except (BadInformation, EmptyInformation) as e:
