@@ -89,22 +89,24 @@ class Recommender:
         logger.debug("Reading songs from CSV files")
         en = pd.read_csv(join(data_path, "tracks en.csv"))
         fa = pd.read_csv(join(data_path, "tracks fa.csv"))
-        self.songs: pd.DataFrame = pd.merge(
+        self._songs: pd.DataFrame = pd.merge(
             en.drop(columns=["download_url"]), fa, how="outer"
         )
-        self.songs.replace({np.NaN: None}, inplace=True)
-        self.num_songs = len(self.songs)
+        self._songs.replace({np.NaN: None}, inplace=True)
+        self.num_songs = len(self._songs)
 
         # Read artists
         logger.debug("Reading artists from CSV files")
         en_artists = pd.read_csv(join(data_path, "artists en.csv"))
         fa_artists = pd.read_csv(join(data_path, "artists fa.csv"))
-        self.artists: pd.DataFrame = pd.merge(en_artists, fa_artists, how="outer")
-        self.artists["description"] = self.artists["description"].str.replace(r"\n", "")
-        self.artists.description.fillna("", inplace=True)
+        self._artists: pd.DataFrame = pd.merge(en_artists, fa_artists, how="outer")
+        self._artists["description"] = self._artists["description"].str.replace(
+            r"\n", ""
+        )
+        self._artists.description.fillna("", inplace=True)
 
-        self.artists_names = self.artists.name.to_list()
-        self.lowered_artists_names = {
+        self.artists_names: List[str] = self._artists.name.to_list()
+        self.lowered_artists_names: Dict[str, Dict[str, Union[int, str]]] = {
             name.lower(): {
                 "id": i,
                 "name": name,
@@ -116,8 +118,8 @@ class Recommender:
         # ).value_counts().all(False)
         # assert no_duplicates, True
 
-        self.songs["genres"] = self.songs["genres"].str.split(",")
-        songs_copy = self.songs.copy()
+        self._songs["genres"] = self._songs["genres"].str.split(",")
+        songs_copy = self._songs.copy()
         # One-hot encode genres
         logger.debug("One-hot encoding genres")
         mlb = MultiLabelBinarizer(sparse_output=True)
@@ -153,7 +155,7 @@ class Recommender:
             PERSIAN_STOP_WORDS = f.read().strip().split()
         stop_words = list(ENGLISH_STOP_WORDS) + PERSIAN_STOP_WORDS
         self.tfidf = TfidfVectorizer(analyzer="word", stop_words=stop_words)
-        self.tfidf = self.tfidf.fit_transform(self.artists["description"])
+        self.tfidf = self.tfidf.fit_transform(self._artists["description"])
 
         # based on https://www.statista.com/statistics/253915/
         # favorite-music-genres-in-the-us/
@@ -387,12 +389,12 @@ class Recommender:
 
         # sort songs by most similar song artists to user artists
         user_artists = [
-            self.artists[self.artists.name == artist]
+            self._artists[self._artists.name == artist]
             for artist in user_preferences.artists
         ]
         if user_artists:
             song_artists = [
-                self.artists[self.artists.name == self.songs.loc[song].artist]
+                self._artists[self._artists.name == self._songs.loc[song].artist]
                 for song in selected
             ]
             cosine_similarities = []
