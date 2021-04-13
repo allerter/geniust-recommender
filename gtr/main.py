@@ -134,7 +134,7 @@ def artists(ids: List[int] = Depends(parse_list("ids", type=int))):
     if len(ids) > 10:
         raise HTTPException(status_code=400, detail="IDs can't be more than 10.")
     try:
-        return {"artists": [recommender.artist(id=id) for id in ids]}
+        return {"artists": recommender.artists(ids=ids)}
     except IndexError:
         raise HTTPException(status_code=404, detail="One of the artists was not found.")
 
@@ -339,6 +339,6 @@ def songs(ids: List[int] = Depends(parse_list("ids", type=int))):
     if len(ids) > 10:
         raise HTTPException(status_code=400, detail="IDs can't be more than 10.")
     try:
-        return {"songs": [recommender.song(id=id) for id in ids]}
+        return {"songs": recommender.songs(ids)}
     except IndexError:
         raise HTTPException(status_code=404, detail="One of the song was not found")
