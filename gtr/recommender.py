@@ -319,7 +319,7 @@ class Recommender:
         # find user artists in recommender artists
         if user_genres:
             for artist in artists:
-                found_artist = self.artists[self.artists.name == artist].name.values
+                found_artist = self._artists[self._artists.name == artist].name.values
                 if found_artist.size > 0:
                     found_artists.append(found_artist[0])
 
