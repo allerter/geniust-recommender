@@ -59,6 +59,13 @@ class TestRecommender:
         if artist == "Eminem":
             assert artist in [x.name for x in res]
 
+    @pytest.mark.parametrize("song", ["Hallucinate", "test", ""])
+    def test_search_song(self, recommender, song):
+        res = recommender.search_song(song)
+
+        if song == "Hallucinate":
+            assert song in [x.name for x in res]
+
     @pytest.mark.parametrize("genres", [[], ["pop", "rap"], ["persian"]])
     def test_binarize(self, recommender, genres):
         res = recommender.binarize(genres)
@@ -121,12 +128,28 @@ class TestRecommender:
 
         assert res.id == artist_id
 
+    def test_artists(self, recommender):
+        artist_ids = [1, 10, 100]
+
+        res = recommender.artists(ids=artist_ids)
+
+        for i, artist in enumerate(res):
+            assert artist.id == artist_ids[i]
+
     def test_song(self, recommender):
         song_id = 1
 
         res = recommender.song(id=1)
 
         assert res.id == song_id
+
+    def test_songs(self, recommender):
+        song_ids = [1, 10, 100]
+
+        res = recommender.songs(ids=song_ids)
+
+        for i, song in enumerate(res):
+            assert song.id == song_ids[i]
 
     def test_song_id_spotify(self, recommender):
         id_spotify = "0x7qAtKBfsMrtpohpw8wB0"
@@ -135,6 +158,18 @@ class TestRecommender:
 
         assert res.id_spotify == id_spotify
 
+    def test_song_ids_spotify(self, recommender):
+        ids_spotify = ["0x7qAtKBfsMrtpohpw8wB0", "17O3WTm9ZebG7njTDCp4mQ"]
+
+        res = recommender.songs(ids_spotify=ids_spotify)
+
+        for i, song in enumerate(res):
+            assert song.id_spotify == ids_spotify[i]
+
     def test_song_no_id(self, recommender):
         with pytest.raises(AssertionError):
             recommender.song()
+
+    def test_songs_no_ids(self, recommender):
+        with pytest.raises(AssertionError):
+            recommender.songs()
