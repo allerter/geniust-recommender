@@ -1,6 +1,5 @@
 import json
 import logging
-from typing import Dict, List, Optional
 from typing import Callable, Dict, List, Optional, Type, Union
 
 import httpx
@@ -30,7 +29,6 @@ ch.setFormatter(formatter)
 logger.addHandler(ch)
 
 
-async def http_429_handler(scope, receive, send) -> None:
 async def http_429_handler(scope: Scope, receive: Receive, send: Send) -> None:
     body = json.dumps({"detail": "Too many requests"}).encode("utf8")
     headers = [
@@ -72,7 +70,6 @@ app.add_middleware(
 recommender = Recommender()
 
 
-def parse_list(param_name: str, type, optional: bool = False):
 def parse_list(
     param_name: str, type: Type[Union[int, str]], optional: bool = False
 ) -> Callable[..., Request]:
@@ -334,7 +331,6 @@ def song(
     tags=["songs"],
     response_description="List of Song objects",
 )
-def songs(ids=Depends(parse_list("ids", type=int))):
 def songs(ids: List[int] = Depends(parse_list("ids", type=int))):
     """Get more than one song using a comma-separated list.
 
