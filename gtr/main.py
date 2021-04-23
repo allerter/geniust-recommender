@@ -1,9 +1,11 @@
 import logging
+import os
 from typing import Callable, Dict, List, Optional, Type, Union
 
 import httpx
 import tekore as tk
 from fastapi import Depends, FastAPI, HTTPException, Path, Query, Request
+from fastapi.openapi.utils import get_openapi
 from ratelimit import Rule
 from ratelimit.backends.redis import RedisBackend
 
@@ -19,6 +21,7 @@ from gtr.recommender import (
     SongType,
 )
 
+# Set up logging
 logger = logging.getLogger("gtr")
 logger.setLevel(logging.DEBUG)
 ch = logging.StreamHandler()
@@ -27,10 +30,43 @@ formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
 ch.setFormatter(formatter)
 logger.addHandler(ch)
 
+
+def custom_openapi():
+    """Add auth options to OpenAPI schema"""
+    if app.openapi_schema:
+        return app.openapi_schema
+    dir_path = os.path.dirname(os.path.realpath(__file__))
+    with open(os.path.join(dir_path, "VERSION"), "r") as f:
+        verison = f.read().strip()
+    openapi_schema = get_openapi(
+        title="GTR Docs",
+        version=verison,
+        description="GeniusT Recommender API Documentation",
+        routes=app.routes,
+    )
+    # define security options
+    security_schemes = {
+        "BearerAuth": {"type": "http", "scheme": "bearer"},
+        "ApiKeyAuth": {"type": "apiKey", "in": "query", "name": "access_token"},
+    }
+    # add scurity schemes to global security schemes and individual routes
+    openapi_schema["components"]["securitySchemes"] = security_schemes
+    for path in openapi_schema["paths"].values():
+        for method in path.values():
+            method["security"] = [security_schemes]
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
+
+
+# Get Redis credentials
 redis_password, redis_socket = REDIS_URL.replace("redis://:", "").split("@")
 redis_host, redis_port = redis_socket.split(":")
 redis_port = int(redis_port)
+
 app = FastAPI()
+app.openapi = custom_openapi  # type: ignore
+
+# Add rate limiting middleware
 app.add_middleware(
     CustomRateLimitMiddleware,
     authenticate=create_jwt_auth(key=SECRET_KEY, algorithms=[HASH_ALGORITHM]),
