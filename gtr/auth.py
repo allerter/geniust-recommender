@@ -1,3 +1,4 @@
+import json
 from json.decoder import JSONDecodeError
 from typing import Awaitable, Callable, List, Tuple, Union
 from urllib.parse import parse_qs
@@ -84,3 +85,13 @@ def create_jwt_auth(
             raise BadInformation(scope, "Invalid token")
 
     return jwt_auth
+
+
+async def http_429_handler(scope: Scope, receive: Receive, send: Send) -> None:
+    body = json.dumps({"detail": "Too many requests"}).encode("utf8")
+    headers = [
+        (b"content-length", str(len(body)).encode("utf8")),
+        (b"content-type", b"application/json"),
+    ]
+    await send({"type": "http.response.start", "status": 429, "headers": headers})
+    await send({"type": "http.response.body", "body": body, "more_body": False})

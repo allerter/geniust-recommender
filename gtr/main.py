@@ -1,4 +1,3 @@
-import json
 import logging
 from typing import Callable, Dict, List, Optional, Type, Union
 
@@ -7,9 +6,8 @@ import tekore as tk
 from fastapi import Depends, FastAPI, HTTPException, Path, Query, Request
 from ratelimit import Rule
 from ratelimit.backends.redis import RedisBackend
-from ratelimit.types import Receive, Scope, Send
 
-from gtr.auth import CustomRateLimitMiddleware, create_jwt_auth
+from gtr.auth import CustomRateLimitMiddleware, create_jwt_auth, http_429_handler
 from gtr.constants import HASH_ALGORITHM, REDIS_URL, SECRET_KEY
 from gtr.recommender import (
     Artist,
@@ -28,17 +26,6 @@ ch.setLevel(logging.DEBUG)
 formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
 ch.setFormatter(formatter)
 logger.addHandler(ch)
-
-
-async def http_429_handler(scope: Scope, receive: Receive, send: Send) -> None:
-    body = json.dumps({"detail": "Too many requests"}).encode("utf8")
-    headers = [
-        (b"content-length", str(len(body)).encode("utf8")),
-        (b"content-type", b"application/json"),
-    ]
-    await send({"type": "http.response.start", "status": 429, "headers": headers})
-    await send({"type": "http.response.body", "body": body, "more_body": False})
-
 
 redis_password, redis_socket = REDIS_URL.replace("redis://:", "").split("@")
 redis_host, redis_port = redis_socket.split(":")
