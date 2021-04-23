@@ -51,9 +51,10 @@ def custom_openapi():
     }
     # add scurity schemes to global security schemes and individual routes
     openapi_schema["components"]["securitySchemes"] = security_schemes
+    path_security_schemes = [{scheme: []} for scheme in security_schemes]
     for path in openapi_schema["paths"].values():
         for method in path.values():
-            method["security"] = [security_schemes]
+            method["security"] = path_security_schemes
     app.openapi_schema = openapi_schema
     return app.openapi_schema
 
