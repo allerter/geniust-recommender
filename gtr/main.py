@@ -55,6 +55,17 @@ def custom_openapi():
     for path in openapi_schema["paths"].values():
         for method in path.values():
             method["security"] = path_security_schemes
+
+    # general info
+    openapi_schema["info"]["contact"] = {
+        "name": "GitHub Repository",
+        "url": "https://github.com/allerter/geniust-recommender",
+    }
+    openapi_schema["info"]["license"] = {
+        "name": "MIT",
+        "url": "https://github.com/allerter/geniust-recommender/blob/main/LICENSE",
+    }
+
     app.openapi_schema = openapi_schema
     return app.openapi_schema
 
