@@ -1,15 +1,15 @@
-import json
 import logging
+import os
 from typing import Callable, Dict, List, Optional, Type, Union
 
 import httpx
 import tekore as tk
 from fastapi import Depends, FastAPI, HTTPException, Path, Query, Request
+from fastapi.openapi.utils import get_openapi
 from ratelimit import Rule
 from ratelimit.backends.redis import RedisBackend
-from ratelimit.types import Receive, Scope, Send
 
-from gtr.auth import CustomRateLimitMiddleware, create_jwt_auth
+from gtr.auth import CustomRateLimitMiddleware, create_jwt_auth, http_429_handler
 from gtr.constants import HASH_ALGORITHM, REDIS_URL, SECRET_KEY
 from gtr.recommender import (
     Artist,
@@ -21,6 +21,7 @@ from gtr.recommender import (
     SongType,
 )
 
+# Set up logging
 logger = logging.getLogger("gtr")
 logger.setLevel(logging.DEBUG)
 ch = logging.StreamHandler()
@@ -30,20 +31,54 @@ ch.setFormatter(formatter)
 logger.addHandler(ch)
 
 
-async def http_429_handler(scope: Scope, receive: Receive, send: Send) -> None:
-    body = json.dumps({"detail": "Too many requests"}).encode("utf8")
-    headers = [
-        (b"content-length", str(len(body)).encode("utf8")),
-        (b"content-type", b"application/json"),
-    ]
-    await send({"type": "http.response.start", "status": 429, "headers": headers})
-    await send({"type": "http.response.body", "body": body, "more_body": False})
+def custom_openapi():
+    """Add auth options to OpenAPI schema"""
+    if app.openapi_schema:
+        return app.openapi_schema
+    dir_path = os.path.dirname(os.path.realpath(__file__))
+    with open(os.path.join(dir_path, "VERSION"), "r") as f:
+        verison = f.read().strip()
+    openapi_schema = get_openapi(
+        title="GTR Docs",
+        version=verison,
+        description="GeniusT Recommender API Documentation",
+        routes=app.routes,
+    )
+    # define security options
+    security_schemes = {
+        "BearerAuth": {"type": "http", "scheme": "bearer"},
+        "ApiKeyAuth": {"type": "apiKey", "in": "query", "name": "access_token"},
+    }
+    # add scurity schemes to global security schemes and individual routes
+    openapi_schema["components"]["securitySchemes"] = security_schemes
+    path_security_schemes = [{scheme: []} for scheme in security_schemes]
+    for path in openapi_schema["paths"].values():
+        for method in path.values():
+            method["security"] = path_security_schemes
+
+    # general info
+    openapi_schema["info"]["contact"] = {
+        "name": "GitHub Repository",
+        "url": "https://github.com/allerter/geniust-recommender",
+    }
+    openapi_schema["info"]["license"] = {
+        "name": "MIT",
+        "url": "https://github.com/allerter/geniust-recommender/blob/main/LICENSE",
+    }
+
+    app.openapi_schema = openapi_schema
+    return app.openapi_schema
 
 
+# Get Redis credentials
 redis_password, redis_socket = REDIS_URL.replace("redis://:", "").split("@")
 redis_host, redis_port = redis_socket.split(":")
 redis_port = int(redis_port)
+
 app = FastAPI()
+app.openapi = custom_openapi  # type: ignore
+
+# Add rate limiting middleware
 app.add_middleware(
     CustomRateLimitMiddleware,
     authenticate=create_jwt_auth(key=SECRET_KEY, algorithms=[HASH_ALGORITHM]),
